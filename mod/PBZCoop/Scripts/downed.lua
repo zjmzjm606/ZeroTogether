@@ -23,7 +23,7 @@ return function(api)
     local net = coop.net
 
     local D = {
-        LOOK_S = 0.25, BAR_S = 1.0, INI_S = 3.0, WIN_AFTER_S = 0.4, BESIDE_CM = 150,
+        LOOK_S = 0.25, BAR_S = 1.0, INI_S = 3.0, WIN_AFTER_S = 0.4, BESIDE_CM = 150, DIAG_S = 3.0,
         revive = true, iniAt = 0, barAt = 0, wasDownAt = nil,
         shown = {},                 -- boss address -> { actor, fname }: bars put up here
         ear = nil,                  -- the listener as it was before the camera took it: { on, comp, loc, rot }
@@ -84,31 +84,104 @@ return function(api)
         return select(2, pcall(function() return a:GetFName():ToString() end))
     end
 
-    local function keepBars()
-        for name, a in pairs(fightBosses()) do
+    local function hudBars(hud)
+        local out = {}
+        pcall(function()
+            local list = hud:GetBossHPBarInstances()
+            for i = 1, #list do
+                local bar = nil
+                pcall(function() bar = list[i]:get() end)
+                if valid(bar) then
+                    out[#out + 1] = bar
+                end
+            end
+        end)
+        return out
+    end
+
+    local function barFor(bars, addr)
+        for _, bar in ipairs(bars) do
+            local who = nil
+            pcall(function() who = bar.Character end)
+            if valid(who) and who:GetAddress() == addr then
+                return bar
+            end
+        end
+        return nil
+    end
+
+    -- Each boss of the fight with its bar on screen: one the HUD still has but hid, shown again; one it took down, put
+    -- back (pbz.lua's keepBossBar, which looks for it on the HUD itself, not at the mod's own note of it); and the HUD
+    -- shown and opaque, if the game put it away for the death.
+    local function keepBars(bosses)
+        local hud = FindFirstOf("PBZHUDLayout")
+        if not valid(hud) then
+            return
+        end
+        pcall(function()
+            local vis = hud:GetVisibility()
+            if vis == 1 or vis == 2 then
+                hud:SetVisibility(4)
+                log("Down: the game had put the HUD away (" .. vis .. "); shown for the boss's bar.")
+            end
+            if hud:GetRenderOpacity() < 0.5 then
+                hud:SetRenderOpacity(1.0)
+                log("Down: the HUD was see-through; made solid for the boss's bar.")
+            end
+        end)
+        local bars = hudBars(hud)
+        for name, a in pairs(bosses) do
             local addr = a:GetAddress()
-            if not game.bossAt(addr, a) then
-                game.showBossBar(a)
-                if game.bossAt(addr, a) then
+            local bar = barFor(bars, addr)
+            if bar then
+                local vis = select(2, pcall(function() return bar:GetVisibility() end))
+                if vis == 1 or vis == 2 then
+                    pcall(function() bar:SetVisibility(4) end)
+                    log("Down: " .. name .. "'s bar was hidden (" .. vis .. "); shown again.")
+                end
+            else
+                if game.keepBossBar then
+                    game.keepBossBar(a)
+                else
+                    game.showBossBar(a)
+                end
+                if barFor(hudBars(hud), addr) then
                     D.shown[addr] = { actor = a, fname = fnameOf(a), name = name }
                     log("Down: " .. name .. "'s bar is up again while you wait.")
                 end
             end
         end
-        -- (The HUD itself, if the game put it away for the death: shown. Left as the game has it after.)
+    end
+
+    -- Every DIAG_S while down in a fight: how it all stands, for the log (the next fix reads it).
+    local function diag(pc, bosses)
+        local parts = {}
+        parts[#parts + 1] = "held " .. tostring(net.holdLooking) .. "/" .. tostring(net.holdWanted) .. "/" .. tostring(net.respawnHeld)
+        parts[#parts + 1] = "watching " .. tostring(game.isSpectating and game.isSpectating())
+        local names = {}
+        for name in pairs(bosses) do
+            names[#names + 1] = name
+        end
+        parts[#parts + 1] = "bosses [" .. table.concat(names, ", ") .. "]"
         pcall(function()
             local hud = FindFirstOf("PBZHUDLayout")
             if valid(hud) then
-                local vis = hud:GetVisibility()
-                if vis == 1 or vis == 2 then
-                    hud:SetVisibility(4)
-                    if not D.hudSaid then
-                        D.hudSaid = true
-                        log("Down: the game had put the HUD away; shown for the boss's bar.")
-                    end
+                parts[#parts + 1] = string.format("HUD vis %s op %.2f inVp %s", tostring(hud:GetVisibility()),
+                    hud:GetRenderOpacity(), tostring(hud:IsInViewport()))
+                local b = {}
+                for _, bar in ipairs(hudBars(hud)) do
+                    local who = select(2, pcall(function() return bar.Character:GetFName():ToString() end))
+                    b[#b + 1] = tostring(who) .. ":" .. tostring(select(2, pcall(function() return bar:GetVisibility() end)))
                 end
+                parts[#parts + 1] = "bars [" .. table.concat(b, ", ") .. "]"
+            else
+                parts[#parts + 1] = "no HUD"
             end
         end)
+        pcall(function()
+            parts[#parts + 1] = "ear override " .. tostring(pc.bOverrideAudioListener) .. (D.ear and " (ours)" or "")
+        end)
+        log("Down (state): " .. table.concat(parts, " | "))
     end
 
     -- Up again: a bar put up here comes down unless its boss is still in a fight of this player's or a partner's.
@@ -339,15 +412,25 @@ return function(api)
                 D.frozen = nil
             end
         end
-        local held = down and net.holdLooking == true
+        -- Down in a fight: the respawn held for it, or a boss of the fight this player was in (or a partner's) still standing.
+        -- (Not the hold alone: with the partner not seen fighting, coop lets the respawn go on after HOLD_GRACE_S, and the
+        -- death screen plays the same, the fight going on without this player.)
+        local bosses = down and fightBosses() or {}
+        local held = down and (net.holdLooking == true or next(bosses) ~= nil)
         if held then
             if not D.told then
                 D.told = true
                 tellSound(pc)
+                diag(pc, bosses)
+                D.diagAt = now + D.DIAG_S
             end
             if now >= D.barAt then
                 D.barAt = now + D.BAR_S
-                keepBars()
+                keepBars(bosses)
+            end
+            if now >= (D.diagAt or 0) then
+                D.diagAt = now + D.DIAG_S
+                diag(pc, bosses)
             end
             if game.isSpectating() then
                 earOnCamera(pc)
