@@ -44,6 +44,9 @@ its author.
   the execution to finish (up to 2.6 s).
 - **Two boss health bars online.** The game's own bar and the mod's bar for a partner's fight could both stay up. One
   bar per boss is kept now, and the one kept follows the shared fight's health.
+- **An enemy back at full health when the host arrives.** With the host far off (over about 120 m), the host doesn't
+  share the enemies around the guest, so the guest's hits never reached the host's world. When the host came near, its
+  whole copy took over. Now the health the guest took off is carried over to the host's copy the moment the two pair up.
 - **Frozen by an item card.** The game can leave a loot card on screen with no button, so no key closes it. Such a card
   is now closed on its own after 3 seconds (the item is already in the bag). F10 closes any card at once.
 - **Some doors only the first player can open.** A partner's door was opened in your world without its scene, and some
@@ -84,7 +87,7 @@ ZeroTogether adds these lines at the end of the file on first start. Each PC has
 | `Scripts/rescue.lua` | New: stuck item cards closed on their own; the reset key. |
 | `Scripts/blockers.lua` | A partner's door that didn't move here is made passable. |
 | `Scripts/partner.lua` | Shift+F3 chooses the F3 target. |
-| `Scripts/coop.lua` | Executions finish before the death; the revive before a boss's death. |
+| `Scripts/coop.lua` | Executions finish before the death; the revive before a boss's death; a guest's damage on an enemy the host didn't share is carried over. |
 | `Scripts/main.lua` | Loads the new modules, each on its own, so an error in one leaves the rest running. |
 | `Scripts/panel.lua`, `onlinepanel.lua`, `pvppanel.lua` | Controls given back after a load. |
 | `art/nameplate/bar.png` | The bars' texture. |

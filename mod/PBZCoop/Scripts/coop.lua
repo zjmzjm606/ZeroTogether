@@ -1521,6 +1521,30 @@ return function(api)
     -- copy's most, what the fight had left. Else whole: a host that lists it no more has it whole again itself (its
     -- fight left, its world refreshed), and one that has it at that floor alive, a partner's killing blow not its end,
     -- has it at a floor of its game's own, a finish only that world's player makes. 394.
+    -- [carry patch] Client: an enemy the host doesn't share (the two over 120 m apart, or not loaded there) is this game's
+    -- own, and this player's blows on it reach nobody: the host has no such enemy at hand to take them (handlers.D). When
+    -- the host came near, its copy was whole, its line paired with this one, and the heal rule below put this one back up
+    -- to full a second on: "the host far off, the guest fought it to half, the host came over and it was full again". So
+    -- one hit here while unpaired (ownLeft: name -> true) has what it lost told to the host as one blow the turn the
+    -- host's line first comes (by the share of its most: the two may have their most apart), and isn't lifted to the
+    -- host's numbers for CARRY_S meanwhile (carryUntil: name -> os.clock()). Not one this game runs for the host
+    -- (net.mine: the host takes its lines), nor one asleep there with a guest by it (its blows reach the host as ever).
+    net.ownLeft, net.carryUntil, net.CARRY_S = {}, {}, 3.0
+    function net.carryOver(name, actor, hp, maxhp, r)
+        net.ownLeft[name] = nil
+        if not (hp and maxhp and maxhp > 0 and r.Hp and r.MaxHp and r.MaxHp > 0 and r.Hp > 1) or r.Asleep then
+            return
+        end
+        local amount = math.min(r.Hp - r.MaxHp * hp / maxhp, r.Hp - 1)
+        if amount <= math.max(1, r.MaxHp * 0.02) then
+            return
+        end
+        sendEvent("D", name, string.format("%.1f", amount), "0", "-", "-", "0.00", "-")
+        net.carryUntil[name] = os.clock() + net.CARRY_S
+        log(string.format("%s was hurt here while the host had it whole (%.0f%% left): told to the host as one blow of %.0f.",
+            name, 100 * hp / maxhp, amount))
+    end
+
     net.LET_GO_LINE_S = 2.0
     function net.letGo(actor, addr, r)
         game.setMinHealth(actor, 0)
@@ -1750,6 +1774,12 @@ return function(api)
                 end
             end
             local r = net.remoteEnemies[name]
+            -- [carry patch] Unpaired and hurt here: remembered; paired now: what it lost goes to the host (net.carryOver).
+            if not r and net.hitHere[name] and not net.mine[name] and isClient() then
+                net.ownLeft[name] = true
+            elseif r and net.ownLeft[name] then
+                net.carryOver(name, actor, hp, maxhp, r)
+            end
             if r then
                 -- One of the host's enemies: it dies when the host says so ("K"), never on its own here, so a
                 -- killing blow is never played twice and a copy that's a hit ahead doesn't die before the host's.
@@ -1831,6 +1861,7 @@ return function(api)
                 -- this player's on its copy, which stood 3% down for good while the host's was whole. The bench of 11-16.
                 -- Not while a killing blow of theirs waits for its answer.)
                 if game.setHealth and not own and rHp ~= nil and hp ~= nil and rMax
+                    and not (net.carryUntil[name] and os.clock() < net.carryUntil[name])   -- [carry patch]
                     and (rHp > hp + math.max(1, rMax * 0.05)
                         or (rHp >= rMax - 0.5 and rHp > hp + 1 and not net.lethalPending[name])) then
                     net.healTicks[name] = net.healTicks[name] or os.clock()
