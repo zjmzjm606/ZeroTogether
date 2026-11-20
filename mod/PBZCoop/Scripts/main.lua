@@ -652,6 +652,15 @@ do
         log("Downed didn't start: " .. tostring(dn))
     end
 end
+-- [rescue patch] Stuck loot cards closed by themselves, and a reset key (rescue.lua).
+do
+    local okRs, rs = pcall(function() return dofile(SCRIPT_DIR .. "rescue.lua")(api) end)
+    if okRs then
+        api.rescue = rs
+    else
+        log("Rescue didn't start: " .. tostring(rs))
+    end
+end
 local net = coop.net
 
 -- Helpers for the "eval" command, so test snippets can reuse the mod's functions.

@@ -15,6 +15,9 @@
 --                     (the game's ShaChi, the bar under health) in numbers, and a bar of each. Grey while they're on
 --                     another map, in a scene, or gone quiet. A partner's 血气 comes as "QI <now> <most>", sent when it
 --                     moves (a 50th of its most at least), four times a second at most, and every 3 s regardless.
+-- HideUIKey (F9): both hidden, and shown again, at a press. PartyBarsY: how far down the list starts, in percent of the
+-- screen's height (22). Shift+F3 chooses who F3 takes this player to, in a party of three or more: the nearest one up (as
+-- the mod does by itself), then each other player in turn; the one chosen has a "»" in the list (partner.lua asks here).
 -- Both hide in a scene of this player's own and in a PvP match (F6), which has its own bars. The widgets sit at the bottom
 -- of the viewport's order, so the game's own menus cover them.
 
@@ -40,7 +43,7 @@ return function(api)
         LIFT_CM = 120,              -- above the figure's middle: over its head
         NEAR_CM = 4500, FAR_CM = 6000,
         BAR_W = 100, BAR_H = 6, NAME_PT = 13, NAME_UP = 13,
-        LIST_X = 34, LIST_TOP = 0.32, LIST_ROW = 56, LIST_BAR_W = 180, LIST_BAR_H = 8, LIST_PT = 13, LIST_BAR_DOWN = 16,
+        LIST_X = 34, LIST_TOP = 0.22, LIST_ROW = 56, LIST_BAR_W = 180, LIST_BAR_H = 8, LIST_PT = 13, LIST_BAR_DOWN = 16,
         QI_H = 5, QI_DOWN = 27,     -- the 血气 bar: under the health one
         TRAIL_WAIT_S = 0.45, TRAIL_SPEED = 0.8,     -- the trail waits this long after a fall, then runs this much of a
                                                     -- bar a second
@@ -61,7 +64,8 @@ return function(api)
     }
 
     local np = { over = true, list = true, mine = nil, sentName = nil, sendAt = 0, iniAt = 0, lookAt = 0, ok = false,
-        added = false, qiAt = 0, qiSent = nil, myQi = nil, myQiMax = nil }
+        added = false, qiAt = 0, qiSent = nil, myQi = nil, myQiMax = nil,
+        hidden = false, hideKey = "F9", resetKey = "F10", keyWas = false, listTop = C.LIST_TOP, target = nil }
     local parts = {}                -- key -> { widget, map, last, madeAt, checkAt }
     local failedAt = {}             -- key -> when it couldn't be made
     local view = { scale = 1, w = 1920, h = 1080, at = -1e9 }
@@ -234,13 +238,31 @@ return function(api)
         if not s then
             return
         end
-        -- (The lines put in once, at the end, for a player to find: the panel's own save, which leaves every other line be.)
-        if not np.added and s.playername == nil and api.panel and api.panel.kit and api.panel.kit.save then
-            np.added = true
-            pcall(api.panel.kit.save, { PlayerName = "", Nameplates = "On", PartyBars = "On" })
-            log("Nameplates: PlayerName, Nameplates and PartyBars added at the end of PhantomPact.ini.")
+        -- (The lines put in once, at the end, for a player to find: the panel's own save, which leaves every other line be.
+        -- Each one missing, so a player who had the first ones gets the later ones too.)
+        if not np.added and api.panel and api.panel.kit and api.panel.kit.save then
+            local add = {}
+            for key, value in pairs({ PlayerName = "", Nameplates = "On", PartyBars = "On", PartyBarsY = "22",
+                HideUIKey = "F9", ResetKey = "F10" }) do
+                if s[key:lower()] == nil then
+                    add[key] = value
+                end
+            end
+            if next(add) then
+                pcall(api.panel.kit.save, add)
+                local names = {}
+                for key in pairs(add) do
+                    names[#names + 1] = key
+                end
+                log("Nameplates: " .. table.concat(names, ", ") .. " added at the end of PhantomPact.ini.")
+            end
         end
         np.added = true
+        local key = (s.hideuikey or "F9"):match("^%s*([%w_]+)%s*$")
+        np.hideKey = key or "F9"
+        np.resetKey = (s.resetkey or "F10"):match("^%s*([%w_]+)%s*$") or "F10"     -- (rescue.lua's)
+        local y = tonumber(s.partybarsy)
+        np.listTop = (y and y >= 0 and y <= 90) and y / 100 or C.LIST_TOP
         local name = clean(s.playername)
         if name ~= np.mine then
             np.mine = name
@@ -581,7 +603,7 @@ return function(api)
         end
         local state = stateOf(p)
         local _, hp, most = healthOf(p)
-        return { key = "l" .. slot, name = nameOf(p, slot), state = state,
+        return { key = "l" .. slot, name = nameOf(p, slot), state = state, chosen = np.target == p,
             colour = state == "up" and colourOf(slot) or state == "down" and C.DOWN or C.GREY,
             hp = hp, most = most, qi = p.ppQi, qiMost = p.ppQiMax }
     end
@@ -605,7 +627,7 @@ return function(api)
 
     -- Down the left of the screen, row i: the name, health and 血气 in numbers, a bar of each.
     local function drawRow(drawn, r, i)
-        local x, y = C.LIST_X, view.h * C.LIST_TOP + (i - 1) * C.LIST_ROW
+        local x, y = C.LIST_X, view.h * np.listTop + (i - 1) * C.LIST_ROW
         local words = WORDS[r.state]
         local said
         if words and r.state ~= "down" then
@@ -624,7 +646,7 @@ return function(api)
         end
         local name = get(r.key .. "_n", makeText, true)
         if name then
-            setText(name, r.name .. "   " .. said, C.LIST_PT, r.colour)
+            setText(name, (r.chosen and "» " or "") .. r.name .. "   " .. said, C.LIST_PT, r.colour)
             place(name, x, y, nil, nil, 1)
             drawn[r.key .. "_n"] = true
         end
@@ -636,6 +658,59 @@ return function(api)
             drawBar(drawn, r.key, mid, y + C.QI_DOWN, C.LIST_BAR_W, C.QI_H, math.max(0, math.min(1, r.qi / r.qiMost)), dim,
                 "_q", C.GOLD, C.TRAIL_QI)
         end
+    end
+
+    -- Who F3 takes this player to, chosen by Shift+F3: nil, the nearest one up (the mod's own way), then each other player
+    -- in turn. A party's only: with two, F3 goes to the one partner there is.
+    local function candidates()
+        local out = {}
+        for _, p in ipairs(coop.partners()) do
+            if p.target and not p.partnerGone then
+                out[#out + 1] = { p = p, slot = slotOf(p) }
+            end
+        end
+        table.sort(out, function(a, b) return a.slot < b.slot end)
+        return out
+    end
+
+    function np.cycleTarget()
+        if not net.party then
+            np.target = nil
+            api.status.notify("tptarget", zh() and "只有一个队友：F3 直接传送到他那里。"
+                or "one partner only: F3 takes you to them.", true)
+            return
+        end
+        local list = candidates()
+        local at = 0
+        for i, e in ipairs(list) do
+            if e.p == np.target then
+                at = i
+            end
+        end
+        local nxt = list[at + 1]
+        np.target = nxt and nxt.p or nil
+        local who = nxt and nameOf(nxt.p, nxt.slot) or (zh() and "最近的队友" or "the nearest partner")
+        api.status.notify("tptarget", (zh() and "F3 传送目标：" or "F3 goes to: ") .. who, true)
+        log("Teleport target: " .. who .. ".")
+    end
+
+    -- The chosen one if still here and up, else nil (the nearest, as before).
+    function np.teleportTarget()
+        local p = np.target
+        if not (p and net.party) then
+            return nil
+        end
+        for _, e in ipairs(candidates()) do
+            if e.p == p then
+                local t = p.target
+                if t and t.Hp and t.Hp > 0 and not t.Cine then
+                    return p
+                end
+                return nil
+            end
+        end
+        np.target = nil         -- (gone from the party)
+        return nil
     end
 
     -- Every frame while co-op runs (coop.lua's frameTicks).
@@ -651,7 +726,20 @@ return function(api)
         if valid(pawn) then
             sendQi(now, pawn)
         end
-        if np.ok and (np.over or np.list) and valid(pc) and valid(pawn) and measure(pc) then
+        if valid(pc) then
+            local down = false
+            pcall(function() down = pc:IsInputKeyDown(api.panel.kit.key(np.hideKey)) end)
+            if down and not np.keyWas then
+                np.hidden = not np.hidden
+                if api.status then
+                    api.status.notify("hideui", np.hidden
+                        and (zh() and ("联机界面已隐藏（按 " .. np.hideKey .. " 显示）") or ("co-op UI hidden (" .. np.hideKey .. " shows it)"))
+                        or (zh() and "联机界面已显示" or "co-op UI shown"), true)
+                end
+            end
+            np.keyWas = down
+        end
+        if not np.hidden and np.ok and (np.over or np.list) and valid(pc) and valid(pawn) and measure(pc) then
             local cam = nil
             if np.over then
                 pcall(function()

@@ -296,6 +296,103 @@ return function(api)
         end
     end
 
+    -- [doors patch] A door opened here by word that didn't open: the switch's step without its scene (SwitchWithoutPlaySequence)
+    -- takes the door's press and its prompt, but some doors move only in that scene, as a kick-stone moves only in the
+    -- kicker's own animation (pbz.lua's STONE note). Such a door stood shut in the partner's world, nothing to press: "some
+    -- doors only the first one can open, the ones after have no interaction key". Looked at DOOR.CHECK_S after: a door of
+    -- static meshes none of which moved is made passable (hidden, no collision; its save says open, so a load shows it as
+    -- the game does). One with a skeletal mesh moves by its bones, not its parts: not judged, left for the reset key
+    -- (rescue.lua, blockers.passableNear), as is any door opened by word near the player. byWord: name -> actor.
+    local DOOR = { CHECK_S = 2.0, MOVED_CM = 2.0, MOVED_DEG = 2.0, byWord = {} }
+
+    local function meshesOf(s, path)
+        local out = {}
+        pcall(function()
+            local list = s:K2_GetComponentsByClass(StaticFindObject(path))
+            for i = 1, #list do
+                local c = list[i]:get()
+                if valid(c) then
+                    out[#out + 1] = c
+                end
+            end
+        end)
+        return out
+    end
+
+    local function posesOf(s)
+        local out = {}
+        local parts = meshesOf(s, "/Script/Engine.StaticMeshComponent")
+        -- (A leaf that's an actor of its own, hung on the door: its root counts as a part. Not judged by the frame alone.)
+        pcall(function()
+            local attached = {}
+            s:GetAttachedActors(attached, true)
+            for i = 1, #attached do
+                local a = attached[i]:get()
+                if valid(a) and valid(a.RootComponent) then
+                    parts[#parts + 1] = a.RootComponent
+                end
+            end
+        end)
+        for _, c in ipairs(parts) do
+            pcall(function()
+                local l, r = c:K2_GetComponentLocation(), c:K2_GetComponentRotation()
+                out[#out + 1] = { c = c, x = l.X, y = l.Y, z = l.Z, p = r.Pitch, w = r.Yaw, r = r.Roll }
+            end)
+        end
+        return out
+    end
+
+    local function movedSince(poses)
+        local function turn(a, b)
+            local d = math.abs(a - b) % 360
+            return math.min(d, 360 - d)
+        end
+        for _, m in ipairs(poses) do
+            local ok, yes = pcall(function()
+                local l, r = m.c:K2_GetComponentLocation(), m.c:K2_GetComponentRotation()
+                local dx, dy, dz = l.X - m.x, l.Y - m.y, l.Z - m.z
+                return math.sqrt(dx * dx + dy * dy + dz * dz) >= DOOR.MOVED_CM or turn(r.Pitch, m.p) >= DOOR.MOVED_DEG
+                    or turn(r.Yaw, m.w) >= DOOR.MOVED_DEG or turn(r.Roll, m.r) >= DOOR.MOVED_DEG
+            end)
+            if ok and yes then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function makePassable(s, name, why)
+        local ok = pcall(function()
+            s:SetActorEnableCollision(false)
+            s:SetActorHiddenInGame(true)
+        end)
+        log("Door " .. name .. (ok and " made passable here (" or " couldn't be made passable (") .. why .. ").")
+        return ok
+    end
+
+    -- The reset key's: every door opened here by word within cm of the pawn, made passable. How many.
+    function blockers.passableNear(pawn, cm)
+        local n = 0
+        local okL, here = pcall(function() return pawn:K2_GetActorLocation() end)
+        if not okL then
+            return 0
+        end
+        for name, s in pairs(DOOR.byWord) do
+            if valid(s) then
+                local okA, at = pcall(function() return s:K2_GetActorLocation() end)
+                if okA and api.distance(at, here) <= cm then
+                    local hidden = select(2, pcall(function() return s.bHidden end))
+                    if hidden ~= true and makePassable(s, name, "the reset key") then
+                        n = n + 1
+                    end
+                end
+            else
+                DOOR.byWord[name] = nil
+            end
+        end
+        return n
+    end
+
     -- (True if it was opened.)
     local function openHere(s, name)
         -- (And the flags its own flow raises once it's opened, its presets' AddTagWhenSuccess, as a partner's chest's are
@@ -313,7 +410,27 @@ return function(api)
             shutHere[name] = true       -- (passed over at the host's next words, as one this world's game shut is)
             return false
         end
+        -- [doors patch] A door's parts as they stand, to see after whether it opened (DOOR, above).
+        local _, cn = sharedSwitch(s)
+        if cn and doorClass[cn] == nil then
+            pcall(isOpen, s, cn)        -- (the class learned now, the same careful way the looks learn it)
+        end
+        local isDoor = cn and doorClass[cn] == true
+        local poses = isDoor and posesOf(s) or nil
+        local bones = isDoor and #meshesOf(s, "/Script/Engine.SkeletalMeshComponent") > 0
         pcall(function() s:SwitchWithoutPlaySequence() end)
+        if isDoor then
+            DOOR.byWord[name] = s
+            local map = net.localMap
+            if poses and #poses > 0 and not bones and api.game and api.game.after then
+                api.game.after(DOOR.CHECK_S, function()
+                    if net.localMap == map and valid(s) and select(2, pcall(function() return s:GetFName():ToString() end)) == name
+                        and not movedSince(poses) then
+                        makePassable(s, name, "opened by word, none of its parts moved")
+                    end
+                end)
+            end
+        end
         if flags then
             api.flowsync.raise(tags, name)
         end

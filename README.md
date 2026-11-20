@@ -26,6 +26,12 @@ its author.
 - **Down in a boss fight:** while you wait for the fight to end, the boss bar stays up, and the sound follows the camera
   on your partner. When your partner lands the final blow on the last boss, you're revived beside them first, so the
   boss's victory and its cutscene play for you too (`BossWinRevive`).
+- **Hide the co-op UI:** F9 hides the names and the party list, and shows them again (`HideUIKey`). The party list now
+  starts higher on the screen, and you can move it (`PartyBarsY`).
+- **Choose who F3 takes you to:** in a party of three or more, Shift+F3 cycles through "nearest partner" and each
+  player. The chosen one has a » in the party list. F3 falls back to the nearest one if they're down or gone.
+- **Reset key:** F10 gets you out of a stuck moment (`ResetKey`): it closes any item card, gives the controls back,
+  stops your own animation, and makes a door near you passable if it was opened by a partner but never moved for you.
 
 **Fixed**
 
@@ -38,6 +44,11 @@ its author.
   the execution to finish (up to 2.6 s).
 - **Two boss health bars online.** The game's own bar and the mod's bar for a partner's fight could both stay up. One
   bar per boss is kept now, and the one kept follows the shared fight's health.
+- **Frozen by an item card.** The game can leave a loot card on screen with no button, so no key closes it. Such a card
+  is now closed on its own after 3 seconds (the item is already in the bag). F10 closes any card at once.
+- **Some doors only the first player can open.** A partner's door was opened in your world without its scene, and some
+  doors only move in that scene: it stayed shut, with no prompt left to press. If none of its parts moved 2 seconds
+  later, the door is made passable for you.
 
 ## Install
 
@@ -59,6 +70,9 @@ ZeroTogether adds these lines at the end of the file on first start. Each PC has
 | `Nameplates` | `On` | Names and health over the other players. |
 | `PartyBars` | `On` | The list down the left of the screen. |
 | `BossWinRevive` | `On` | Revive a downed player when the last boss falls, so they see its ending. `Off`: respawn at the bell as before. |
+| `PartyBarsY` | `22` | Where the party list starts, in percent of the screen's height from the top. |
+| `HideUIKey` | `F9` | Hides and shows the names and the party list. |
+| `ResetKey` | `F10` | The reset key above. |
 
 ## What changed in the code
 
@@ -67,8 +81,11 @@ ZeroTogether adds these lines at the end of the file on first start. Each PC has
 | `Scripts/nameplates.lua` | New: names, health and 血气 over heads and in the party list; the `NAME` and `QI` messages. |
 | `Scripts/bossbars.lua` | New: one boss bar per boss online. |
 | `Scripts/downed.lua` | New: boss bar, sound and revive for a player down in a boss fight. |
+| `Scripts/rescue.lua` | New: stuck item cards closed on their own; the reset key. |
+| `Scripts/blockers.lua` | A partner's door that didn't move here is made passable. |
+| `Scripts/partner.lua` | Shift+F3 chooses the F3 target. |
 | `Scripts/coop.lua` | Executions finish before the death; the revive before a boss's death. |
-| `Scripts/main.lua` | Loads the three new modules, each on its own, so an error in one leaves the rest running. |
+| `Scripts/main.lua` | Loads the new modules, each on its own, so an error in one leaves the rest running. |
 | `Scripts/panel.lua`, `onlinepanel.lua`, `pvppanel.lua` | Controls given back after a load. |
 | `art/nameplate/bar.png` | The bars' texture. |
 

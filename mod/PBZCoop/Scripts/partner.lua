@@ -233,7 +233,9 @@ return function(api)
             tip("join", "TP > PARTNER is off. Turn it on in MORE (F5).")
             return
         end
-        local why = coop.joinPartner(coop.nearestPartner())
+        -- [teleport-target patch] The one chosen with Shift+F3 (nameplates.lua), if still here and up; else the nearest.
+        local chosen = api.nameplates and api.nameplates.teleportTarget and api.nameplates.teleportTarget() or nil
+        local why = coop.joinPartner(chosen or coop.nearestPartner())
         if why then
             api.status.lastShown.join = nil     -- (a press deserves its answer, however soon after the last)
             tip("join", why)
@@ -248,7 +250,17 @@ return function(api)
         end
         local down = controller:IsInputKeyDown(api.panel.kit.key("F3"))
         if down and not wasKey and net.enabled then
-            partner.go()
+            -- [teleport-target patch] Shift+F3: who F3 takes this player to (nameplates.lua), not a trip.
+            local shift = false
+            pcall(function()
+                shift = controller:IsInputKeyDown(api.panel.kit.key("LeftShift"))
+                    or controller:IsInputKeyDown(api.panel.kit.key("RightShift"))
+            end)
+            if shift and api.nameplates and api.nameplates.cycleTarget then
+                api.nameplates.cycleTarget()
+            else
+                partner.go()
+            end
         end
         wasKey = down
     end
