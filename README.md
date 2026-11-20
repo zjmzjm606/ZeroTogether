@@ -1,3 +1,88 @@
+# ZeroTogether
+
+English | [简体中文](README.zh-CN.md)
+
+**ZeroTogether** is an extended, unofficial fork of [Phantom Pact](https://github.com/yhsharaf/PhantomPact) by
+yhsharaf, the online co-op mod for **Phantom Blade Zero**. Everything Phantom Pact does is still here, plus the additions
+and fixes below. ZeroTogether is not made or endorsed by yhsharaf or by S-GAME; the credit for Phantom Pact itself goes to
+its author.
+
+> These changes are new and still being tested in play. Please report problems with ZeroTogether's additions in
+> [this repository's issues](https://github.com/zjmzjm606/ZeroTogether/issues), not to Phantom Pact.
+
+## What ZeroTogether adds
+
+**New**
+
+- **Names and health over heads:** each partner's name, in their player colour (red while they're down), with a health
+  bar above their figure. Shown up to 60 m away, fading from 45 m.
+- **Party list:** down the left of the screen, you first, then each partner: name, health and 血气 (the game's ShaChi,
+  the bar under health) in numbers, with a bar for each. A row turns grey while that partner is on another map, in a
+  cutscene, or not responding.
+- **Your own name:** set `PlayerName` in `PhantomPact.ini`, up to 16 characters (Chinese works). The others see the new
+  name within a few seconds; no restart needed.
+- **Better bars:** a thin dark frame, a visible empty track, a damage trail that holds for a moment after a hit and then
+  runs down, and a soft shine along the top.
+- **Down in a boss fight:** while you wait for the fight to end, the boss bar stays up, and the sound follows the camera
+  on your partner. When your partner lands the final blow on the last boss, you're revived beside them first, so the
+  boss's victory and its cutscene play for you too (`BossWinRevive`).
+
+**Fixed**
+
+- **A guest can't move or press anything after first joining.** The F5 panel switches the controls to menu-only mode.
+  On a guest's first join the game loads them into the host's world, which replaces the player controller, and the
+  panel then closed without giving the controls back. It now gives them back on the current controller, or as soon as
+  there is one. Fixed in the online, PvP and local co-op panels.
+- **Executions cut short on the other screen.** A death that arrived in the middle of an execution stopped the enemy's
+  animation at once, and a guest's killing blow carried no animation for the host to play. The death now waits for
+  the execution to finish (up to 2.6 s).
+- **Two boss health bars online.** The game's own bar and the mod's bar for a partner's fight could both stay up. One
+  bar per boss is kept now, and the one kept follows the shared fight's health.
+
+## Install
+
+1. Install **UE4SS for Phantom Blade Zero** (Vercadi, Nexus Mods) 1.0.3 or newer, and **Phantom Pact 1.7.4**, as
+   [INSTALL.md](INSTALL.md) describes. ZeroTogether needs Phantom Pact's built `main.dll`, which is in its release and
+   not in this source tree.
+2. Download this repository (**Code → Download ZIP**). Copy `mod/PBZCoop/Scripts` and `mod/PBZCoop/art` into
+   `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`, replacing files. Your `PhantomPact.ini` is left as it is.
+3. Every player should install ZeroTogether: names, 血气 and the guest-side fixes need it on both PCs. A player without
+   it still links up, and shows up as "Host" / "Player 2" with health only.
+
+## New settings (`PhantomPact.ini`)
+
+ZeroTogether adds these lines at the end of the file on first start. Each PC has its own.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `PlayerName` | empty | Your name on the others' screens. Empty: "Host" / "Player 2"... |
+| `Nameplates` | `On` | Names and health over the other players. |
+| `PartyBars` | `On` | The list down the left of the screen. |
+| `BossWinRevive` | `On` | Revive a downed player when the last boss falls, so they see its ending. `Off`: respawn at the bell as before. |
+
+## What changed in the code
+
+| File | |
+| --- | --- |
+| `Scripts/nameplates.lua` | New: names, health and 血气 over heads and in the party list; the `NAME` and `QI` messages. |
+| `Scripts/bossbars.lua` | New: one boss bar per boss online. |
+| `Scripts/downed.lua` | New: boss bar, sound and revive for a player down in a boss fight. |
+| `Scripts/coop.lua` | Executions finish before the death; the revive before a boss's death. |
+| `Scripts/main.lua` | Loads the three new modules, each on its own, so an error in one leaves the rest running. |
+| `Scripts/panel.lua`, `onlinepanel.lua`, `pvppanel.lua` | Controls given back after a load. |
+| `art/nameplate/bar.png` | The bars' texture. |
+
+## Credits
+
+- **Phantom Pact:** yhsharaf and its contributors ([original repository](https://github.com/yhsharaf/PhantomPact)).
+  ZeroTogether is built on it.
+- **UE4SS for Phantom Blade Zero:** Vercadi (Nexus Mods). **UE4SS:** the UE4SS team (MIT License).
+- Fan-made, not affiliated with or endorsed by S-GAME.
+
+---
+
+*The original Phantom Pact README follows.*
+
 <p align="center">
   <img src="art/phantom-pact-banner-1300x372.png" alt="Phantom Pact: Online Co-op for Phantom Blade Zero" width="100%">
 </p>

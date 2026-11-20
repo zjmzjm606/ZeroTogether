@@ -462,7 +462,10 @@ return function(api)
             hud.show(p.widget, false)
         end
         hud.show(wordsWidget, false)
-        if valid(pc) then
+        -- [input patch] On the controller as it is now (a load while open took this one: panel.lua's giveBack).
+        if kit.giveBack then
+            kit.giveBack(pc, function() return panel.open end)
+        elseif valid(pc) then
             kit.blockPlay(pc, false)
         end
         log("PvP page closed.")

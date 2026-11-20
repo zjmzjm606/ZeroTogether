@@ -460,6 +460,43 @@ return function(api)
         end
     end
 
+    -- [input patch] The controls given back as a panel closes, on the player's controller as it is now. A panel open across
+    -- a load (a guest's first join brings them into the host's world) saw its own controller go with the old world: its
+    -- close gave nothing back, and the game window, which keeps the menu-only input mode across a load, ignored every key
+    -- and pad from then on: "the guest who joins first can't move or do anything, no key works". No controller yet
+    -- (mid-load): given back as soon as there is one, unless that panel is open again by then. isOpen: that panel's.
+    local owedInput = nil
+    local function giveBack(old, isOpen)
+        local now = api.getPlayer1()
+        local c = valid(now) and now or (valid(old) and old or nil)
+        if c then
+            pcall(blockPlay, c, false)
+        end
+        if valid(now) then
+            owedInput = nil
+        else
+            owedInput = isOpen or function() return false end
+            log("A panel closed with no player here (a load): the controls are given back once there is one.")
+        end
+    end
+    LoopInGameThreadWithDelay(500, function()
+        if owedInput then
+            local open = false
+            pcall(function() open = owedInput() == true end)
+            if open then
+                owedInput = nil         -- (open again: its own close gives them back)
+            else
+                local c = api.getPlayer1()
+                if valid(c) then
+                    owedInput = nil
+                    pcall(blockPlay, c, false)
+                    log("The controls are given back after the load.")
+                end
+            end
+        end
+        return false
+    end)
+
     local function writeWant(on)
         local path = api.modDir() .. "pads_want.txt"
         if on then
@@ -502,9 +539,7 @@ return function(api)
         for _, p in pairs(parts) do
             hud.show(p.widget, false)
         end
-        if valid(keyboardPc) then
-            blockPlay(keyboardPc, false)
-        end
+        giveBack(keyboardPc, function() return panel.open end)      -- [input patch]
         log("Panel closed.")
     end
 
@@ -558,7 +593,7 @@ return function(api)
 
     -- What the online panel (onlinepanel.lua) draws and reads with: the same units, widgets and input.
     panel.kit = { W = W, H = H, origin = origin, parts = parts, part = part, place = place, hide = hide, dim = dim,
-        picture = picture, measure = measure, input = input, inside = inside, key = key, blockPlay = blockPlay, writeWant = writeWant,
+        picture = picture, measure = measure, input = input, inside = inside, key = key, blockPlay = blockPlay, giveBack = giveBack, writeWant = writeWant,
         save = save }
 
     return panel

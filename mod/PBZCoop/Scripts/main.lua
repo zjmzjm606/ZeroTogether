@@ -624,6 +624,34 @@ api.rules = dofile(SCRIPT_DIR .. "rules.lua")(api)
 api.prologue = dofile(SCRIPT_DIR .. "prologue.lua")(api)
 api.qte = dofile(SCRIPT_DIR .. "qte.lua")(api)
 api.lesson = dofile(SCRIPT_DIR .. "lesson.lua")(api)
+-- [nameplates patch] Names and health of the other players, over their heads and down the left (nameplates.lua). In a
+-- pcall of its own: a fault in it leaves the rest of the mod as it was.
+do
+    local okNp, np = pcall(function() return dofile(SCRIPT_DIR .. "nameplates.lua")(api) end)
+    if okNp then
+        api.nameplates = np
+    else
+        log("Nameplates didn't start: " .. tostring(np))
+    end
+end
+-- [bossbars patch] One boss bar a boss online (bossbars.lua). Its own pcall too.
+do
+    local okBb, bb = pcall(function() return dofile(SCRIPT_DIR .. "bossbars.lua")(api) end)
+    if okBb then
+        api.bossbars = bb
+    else
+        log("Boss bars didn't start: " .. tostring(bb))
+    end
+end
+-- [downed patch] Down in a boss fight: its bar, its sound, and back on your feet for the boss's fall (downed.lua).
+do
+    local okDn, dn = pcall(function() return dofile(SCRIPT_DIR .. "downed.lua")(api) end)
+    if okDn then
+        api.downed = dn
+    else
+        log("Downed didn't start: " .. tostring(dn))
+    end
+end
 local net = coop.net
 
 -- Helpers for the "eval" command, so test snippets can reuse the mod's functions.

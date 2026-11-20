@@ -1,3 +1,67 @@
+# ZeroTogether
+
+[English](README.md) | 简体中文
+
+**ZeroTogether** 是 yhsharaf 的[幻影契约(Phantom Pact)](https://github.com/yhsharaf/PhantomPact)的一个非官方增强分支。幻影契约是《影之刃零》的线上联机模组,
+它原有的功能这里全部保留,另外加了下面这些新功能和修复。ZeroTogether 不是 yhsharaf 或 S-GAME 制作或认可的,幻影契约本身的功劳归原作者。
+
+> 这些改动是新做的,还在实际游玩中测试。ZeroTogether 新增部分的问题请提到[本仓库的 Issues](https://github.com/zjmzjm606/ZeroTogether/issues),不要提给幻影契约。
+
+## ZeroTogether 加了什么
+
+**新功能**
+
+- **头顶名字和血条:** 每个队友头上显示名字(用他的玩家颜色,倒地时变红)和一条血条。60 米内显示,45 米开始变淡。
+- **左侧队伍列表:** 屏幕左边先列你自己,再列每个队友:名字、血量和血气(游戏里血条下面那条 ShaChi)的数值,各配一条进度条。队友在别的地图、过场中或没有响应时,那一行变灰。
+- **自定义名字:** 在 `PhantomPact.ini` 里设置 `PlayerName`,最多 16 个字,中文也行。改完几秒内队友就能看到,不用重启。
+- **更好看的血条:** 黑色细边框、看得见的空槽、挨打后停一下再滑落的掉血残影,以及顶部一道淡淡的高光。
+- **Boss 战中倒地:** 等待战斗结束时,Boss 血条一直显示,声音跟着看队友的镜头走。队友打出最后一个 Boss 的最后一击时,会先把你在队友身边原地拉起来,这样 Boss 的胜利流程和结局过场你也能看到(`BossWinRevive`)。
+
+**修复**
+
+- **客机第一次进房间后不能动、什么键都没用。** 按 F5 打开面板时,操作会切到"只操作菜单"模式。客机第一次加入时游戏会读图把你送进主机的世界,读图会换掉玩家控制器,面板关闭时就没把操作切回来。现在会用当前的控制器切回;还在读图的话,等控制器出现后马上切回。联机、PvP、本地分屏三个面板都修了。
+- **另一边看不到完整的处决动画。** 处决进行到一半时传来的死亡会直接打断敌人的动画,客机的致命一击也没有带上动画给主机播放。现在死亡会等处决播完(最多 2.6 秒)。
+- **联机打 Boss 时出现两条血条。** 游戏自己的血条和 mod 替队友那边战斗挂的血条可能同时留着。现在每个 Boss 只留一条,留下的那条跟着共享战斗的血量走。
+
+## 安装
+
+1. 按 [INSTALL.zh-CN.md](INSTALL.zh-CN.md) 的说明,装好 **UE4SS for Phantom Blade Zero**(Vercadi,Nexus Mods)1.0.3 或更新版,以及**幻影契约 1.7.4**。ZeroTogether 需要幻影契约发布包里编译好的 `main.dll`,这个源码仓库里没有。
+2. 下载本仓库(**Code → Download ZIP**),把 `mod/PBZCoop/Scripts` 和 `mod/PBZCoop/art` 复制到 `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`,替换原有文件。你的 `PhantomPact.ini` 不会被动到。
+3. 每个玩家都要装 ZeroTogether:名字、血气和客机那边的修复都需要两台电脑都装。没装的玩家也能正常联机,只是显示成"主机"或"玩家 2",也只有血量。
+
+## 新增设置(`PhantomPact.ini`)
+
+第一次启动时,ZeroTogether 会把这几行加到文件末尾。每台电脑各自设置。
+
+| 设置 | 默认 | 作用 |
+| --- | --- | --- |
+| `PlayerName` | 空 | 你在别人屏幕上显示的名字。留空则显示"主机"或"玩家 2"等。 |
+| `Nameplates` | `On` | 在其他玩家头上显示名字和血条。 |
+| `PartyBars` | `On` | 屏幕左侧的队伍列表。 |
+| `BossWinRevive` | `On` | 最后一个 Boss 倒下时把倒地的玩家拉起来看结局。`Off`:像以前一样回钟那里复活。 |
+
+## 代码改了哪里
+
+| 文件 | |
+| --- | --- |
+| `Scripts/nameplates.lua` | 新增:头顶和队伍列表里的名字、血量和血气;`NAME` 和 `QI` 两种消息。 |
+| `Scripts/bossbars.lua` | 新增:联机时每个 Boss 只留一条血条。 |
+| `Scripts/downed.lua` | 新增:Boss 战中倒地时的血条、声音和复活。 |
+| `Scripts/coop.lua` | 处决播完再死亡;Boss 死亡前先复活。 |
+| `Scripts/main.lua` | 加载三个新模块,每个单独加载,一个出错不影响其他部分。 |
+| `Scripts/panel.lua`、`onlinepanel.lua`、`pvppanel.lua` | 读图后把操作还给玩家。 |
+| `art/nameplate/bar.png` | 血条用的贴图。 |
+
+## 致谢
+
+- **幻影契约(Phantom Pact):** yhsharaf 及其贡献者([原仓库](https://github.com/yhsharaf/PhantomPact))。ZeroTogether 在它的基础上制作。
+- **UE4SS for Phantom Blade Zero:** Vercadi(Nexus Mods)。**UE4SS:** UE4SS 团队(MIT 许可)。
+- 粉丝自制,与 S-GAME 无关,也未获其认可。
+
+---
+
+*以下是原版幻影契约的说明。*
+
 <p align="center">
   <img src="art/phantom-pact-banner-1300x372.png" alt="幻影契约 Phantom Pact:《影之刃零》线上联机模组" width="100%">
 </p>

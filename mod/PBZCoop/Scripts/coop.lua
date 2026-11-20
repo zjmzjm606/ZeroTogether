@@ -1219,6 +1219,14 @@ return function(api)
             local path, pos, tag
             if api.puppets and not lethal then
                 path, pos, tag = api.puppets.reactionOf(enemy)
+            elseif api.puppets and lethal and not finisher then
+                -- [exec-sync patch] A killing blow inside this player's execution: the enemy's side of it goes with the
+                -- blow, so the host plays it before the death (handlers.D). Before, a killing blow carried no reaction,
+                -- and the host's enemy just fell while the partner's figure swung at it.
+                local p2, q2, t2 = api.puppets.reactionOf(enemy)
+                if t2 and t2:find("Executing", 1, true) then
+                    path, pos, tag = p2, q2, t2
+                end
             end
             sendEvent("D", id, string.format("%.1f", hpDamage), string.format("%.1f", postureDamage or 0),
                 lethal and (finisher and "X" or "L") or "-", path or "-", string.format("%.2f", pos or 0), tag or "-")
@@ -1551,6 +1559,34 @@ return function(api)
             return false
         end
         return os.clock() - (net.execMarkAt[name] or -1e9) <= net.EXEC_MARK_S or game.hasEffect(actor, net.EXEC_MARK, true)
+    end
+
+    -- [exec-sync patch] Seconds left of the enemy's own side of an execution playing on it here (by its hit state, or by
+    -- the name of the montage it plays), at most EXEC_HOLD_MAX_S; nil when it plays none. A death told in the middle of
+    -- one waits for it (handlers.K, handlers.D): killForReal stops whatever montage plays (stopSwing), which cut every
+    -- execution short on the other screen. (On net: this function is at Lua's 200 locals.)
+    net.EXEC_HOLD_MAX_S = 2.6
+    net.execHeld = {}
+    net.winHeld = {}                -- [downed patch] boss id -> a partner's killing blow waiting on this player's revive
+    function net.execLeft(actor)
+        local left = nil
+        pcall(function()
+            local ai = api.moves and api.moves.animOf(actor)
+            local m = ai and ai:GetCurrentActiveMontage()
+            if not valid(m) then
+                return
+            end
+            local state = game.hitStateOf and game.hitStateOf(actor)
+            local word = m:GetFName():ToString():lower()
+            if not ((state and state:find("Executing", 1, true)) or word:find("exe", 1, true)) then
+                return
+            end
+            local t = m:GetPlayLength() - (ai:Montage_GetPosition(m) or 0)
+            if t > 0.15 then
+                left = math.min(net.EXEC_HOLD_MAX_S, t)
+            end
+        end)
+        return left
     end
 
     -- keep: address -> actor still held this tick (nil releases every held copy).
@@ -3038,35 +3074,85 @@ return function(api)
                 elseif fought and not quiet and game.killForReal then
                     -- The boss of a fight both are in: the whole death here too, so this world's story goes on with the
                     -- host's, its scene after the fight first (a quiet kill skipped it, and the next phase came unseen).
-                    if net.killWatched(actor, down) then
-                        log("Host says " .. name .. " died; its death runs here too.")
-                    elseif game.kill then
-                        -- (Refused here (a phase or floor of this world's own): the host's word stands, the quiet death.)
-                        game.kill(actor)
-                        log("Host says " .. name .. " died; its death was refused here, killed it quietly.")
-                        bring.cardsLater()
+                    local function bossDies()
+                        if net.killWatched(actor, down) then
+                            log("Host says " .. name .. " died; its death runs here too.")
+                        elseif game.kill then
+                            -- (Refused here (a phase or floor of this world's own): the host's word stands, the quiet death.)
+                            game.kill(actor)
+                            log("Host says " .. name .. " died; its death was refused here, killed it quietly.")
+                            bring.cardsLater()
+                        end
+                    end
+                    -- [downed patch] This player down in that fight: back on their feet first (downed.lua), for the death to
+                    -- run the whole way here, its scene too. With its player dead the game runs it another way: no win's
+                    -- steps, no scene (flowsync.lua's note of the bench).
+                    if api.downed and api.downed.reviveForWin and api.downed.reviveForWin(name, actor) then
+                        local fname = select(2, pcall(function() return actor:GetFName():ToString() end))
+                        game.after(api.downed.WIN_AFTER_S or 0.4, function()
+                            if valid(actor) and select(2, pcall(function() return actor:GetFName():ToString() end)) == fname
+                                and not (game.isDead and game.isDead(actor)) then
+                                local ok, err = pcall(bossDies)
+                                if not ok then
+                                    log("Boss death after the revive failed: " .. tostring(err))
+                                end
+                            end
+                        end)
+                    else
+                        bossDies()
                     end
                 elseif not wasBoss and not quiet and game.killForReal then
                     -- The game's own death, at level 0 so it pays nothing here: the quiet kill skipped what listens for
                     -- deaths, and a quest waiting for the monsters to be dealt with (Fierce Axe) never moved, not even after
                     -- a reload.
-                    if net.killWatched(actor, down) then
-                        log("Host says " .. name .. " died; it dies here too.")
-                        -- (Nothing of it is owed: with the host down, or up within its quiet after, no share of it
-                        -- comes, and its copy's own pay taken back left this player nothing for the kill. When the host
-                        -- was last seen down goes with the copy's pay: pbz.lua's watchCurrency. The review of 11-16.)
-                        -- (This kill's own roll alone: a boss's in the same pay is owed, its share comes once the host
-                        -- is up. The third review.)
-                        -- (The host at 0 now counts: seen down only after a second, a kill in that second was taken
-                        -- back with no share to come.)
-                        local downAt = net.zeroSince and os.clock() or net.downSeenAt
-                        if game.copyPay and not byGuest and downAt
-                            and os.clock() - downAt < game.dustWatch.AFTER_DOWN_S then
-                            game.copyPay.hostDownAt = downAt
-                            game.copyPay.keep = (game.copyPay.keep or 0) + (game.copyPay.last or 0)
+                    -- [exec-sync patch] Dying in the middle of an execution (the host's, its side played here by A, or this
+                    -- player's own, its copy held at 1): the kill waits till that ends. Run at once, killForReal stopped the
+                    -- montage (stopSwing) and the execution was cut short on this screen. What K tells otherwise goes on now.
+                    local function dies()
+                        if net.killWatched(actor, down) then
+                            log("Host says " .. name .. " died; it dies here too.")
+                            -- (Nothing of it is owed: with the host down, or up within its quiet after, no share of it
+                            -- comes, and its copy's own pay taken back left this player nothing for the kill. When the host
+                            -- was last seen down goes with the copy's pay: pbz.lua's watchCurrency. The review of 11-16.)
+                            -- (This kill's own roll alone: a boss's in the same pay is owed, its share comes once the host
+                            -- is up. The third review.)
+                            -- (The host at 0 now counts: seen down only after a second, a kill in that second was taken
+                            -- back with no share to come.)
+                            local downAt = net.zeroSince and os.clock() or net.downSeenAt
+                            if game.copyPay and not byGuest and downAt
+                                and os.clock() - downAt < game.dustWatch.AFTER_DOWN_S then
+                                game.copyPay.hostDownAt = downAt
+                                game.copyPay.keep = (game.copyPay.keep or 0) + (game.copyPay.last or 0)
+                            end
+                        else
+                            log("Host says " .. name .. " died; its death was refused here: tried again, then dissolved.")
                         end
+                    end
+                    local execWait = net.execLeft and net.execLeft(actor)
+                    if execWait then
+                        local fname = select(2, pcall(function() return actor:GetFName():ToString() end))
+                        log(string.format("Host says %s died in an execution: it dies here in %.1f s, as that ends.",
+                            name, execWait))
+                        -- (Kept on its floor meanwhile, and out of the hold's list so the next round doesn't let it go: an
+                        -- execution's later blows would else be its death in this world, its own pay on top of the
+                        -- host's share. killForReal takes the floor off itself.)
+                        pcall(function()
+                            net.heldAlive[actor:GetAddress()] = nil
+                            if game.setMinHealth then
+                                game.setMinHealth(actor, HELD_HP)
+                            end
+                        end)
+                        game.after(execWait, function()
+                            if valid(actor) and select(2, pcall(function() return actor:GetFName():ToString() end)) == fname
+                                and not (game.isDead and game.isDead(actor)) then
+                                local ok, err = pcall(dies)
+                                if not ok then
+                                    log("Held execution death failed: " .. tostring(err))
+                                end
+                            end
+                        end)
                     else
-                        log("Host says " .. name .. " died; its death was refused here: tried again, then dissolved.")
+                        dies()
                     end
                 elseif game.kill then
                     game.kill(actor)
@@ -3194,6 +3280,50 @@ return function(api)
                 api.puppets.react(name, actor, rpath, rpos, rtag)
             end
         end
+        -- [exec-sync patch] A partner's killing blow struck inside their execution of one of this world's enemies (its
+        -- reaction is the execution's: reportHit sends it with such a blow): the enemy's side of the execution plays here
+        -- first, and the blow is taken as it ends. Taken at once, the enemy fell here the moment the blow came, its side of
+        -- the execution never played, while the partner's figure went through theirs at nothing. Their re-tells meanwhile
+        -- (LETHAL_AGAIN_S) wait for that. Not a boss: its finishing move has rules of its own, above and below.
+        if isHost() and name and lethal == "L" and not finisher and not gapTold and rtag
+            and rtag:find("Executing", 1, true) and not net.execHeld.now and api.moves and not net.guestRuns[name] then
+            if net.execHeld[name] then
+                return          -- (told again while its execution plays here: taken once, as that ends)
+            end
+            local actor = enemyByName[name]
+            local m = valid(actor) and rpath ~= "-" and api.moves.allowedPath(rpath) and api.moves.montage(rpath)
+            local boss = net.partnerBosses[name] or (valid(actor) and game.isBoss and game.isBoss(actor))
+                or (valid(actor) and game.bossTwin and game.bossTwin(actor))
+            if m and not boss and not (game.isDead and game.isDead(actor)) then
+                local len = 0
+                pcall(function() len = m:GetPlayLength() end)
+                local wait = math.min(net.EXEC_HOLD_MAX_S, (tonumber(len) or 0) - rpos - net.moveAge())
+                if wait > 0.15 then
+                    react(actor)
+                    -- (Its line says 1 meanwhile: at what it had, the partner's copy, held at 1, was "healed on the host"
+                    -- back up a second on, its bar jumping in the middle of the execution.)
+                    pcall(function()
+                        local hp = game.getHealth(actor)
+                        if game.setHealth and hp and hp > 1 then
+                            game.setHealth(actor, 1)
+                        end
+                    end)
+                    net.execHeld[name] = true
+                    log(string.format("Partner's execution of %s plays here first: the blow is taken in %.1f s.", name, wait))
+                    local again = handlers.D
+                    game.after(wait, function()
+                        net.execHeld[name] = nil
+                        net.execHeld.now = true
+                        local ok, err = pcall(again, rest, from)
+                        net.execHeld.now = nil
+                        if not ok then
+                            log("Held execution blow failed: " .. tostring(err))
+                        end
+                    end)
+                    return
+                end
+            end
+        end
         if isClient() and name and net.mine[name] then
             -- The host's hit on one this game runs (handover): it lands here, where the enemy lives. A killing blow is its
             -- whole death here, paying this player, and that dust reaches the host as any of this player's does.
@@ -3273,6 +3403,29 @@ return function(api)
                 -- and no other phase of it to come (game.phaseAfter). The game's kill takes whatever holds Health_Min
                 -- once that's 0 (run211: his lock was still on him), so at a phase's floor, or one held for a scene, it
                 -- would be 193 again. The tenth review. The floor back if the game still won't let it die.)
+                -- [downed patch] This player down in that fight, and the blow the boss's end: back on their feet first
+                -- (downed.lua), the blow taken a moment later (told again meanwhile: once). Dead, this world runs a boss's
+                -- death another way: no win's steps, no scene.
+                if lethal == "L" and amount == math.huge and boss and net.winHeld and not net.winHeld.now and api.downed
+                    and api.downed.reviveForWin then
+                    if net.winHeld[name] then
+                        return
+                    end
+                    if api.downed.reviveForWin(name, actor) then
+                        net.winHeld[name] = true
+                        local again = handlers.D
+                        game.after(api.downed.WIN_AFTER_S or 0.4, function()
+                            net.winHeld[name] = nil
+                            net.winHeld.now = true
+                            local ok, err = pcall(again, rest, from)
+                            net.winHeld.now = nil
+                            if not ok then
+                                log("The partner's blow after the revive failed: " .. tostring(err))
+                            end
+                        end)
+                        return
+                    end
+                end
                 local floor0 = nil
                 if finisher and boss and game.healthFloor and game.setMinHealth and before then
                     local floor = game.healthFloor(actor)
