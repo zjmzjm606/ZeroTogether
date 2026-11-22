@@ -58,7 +58,7 @@ its author.
 1. Install **UE4SS for Phantom Blade Zero** (Vercadi, Nexus Mods) 1.0.3 or newer, and **Phantom Pact 1.7.4**, as
    [INSTALL.md](INSTALL.md) describes. ZeroTogether needs Phantom Pact's built `main.dll`, which is in its release and
    not in this source tree.
-2. Download this repository (**Code → Download ZIP**). Copy `mod/PBZCoop/Scripts` and `mod/PBZCoop/art` into
+2. Download the packaged [ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip) and unzip it into the game's root folder `PBZ\`, overwriting. Or download this repository (**Code → Download ZIP**) and copy `mod/PBZCoop/Scripts` and `mod/PBZCoop/art` into
    `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`, replacing files. Your `PhantomPact.ini` is left as it is.
 3. Every player should install ZeroTogether: names, 血气 and the guest-side fixes need it on both PCs. A player without
    it still links up, and shows up as "Host" / "Player 2" with health only.
