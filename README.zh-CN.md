@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-## ⬇️ [下载 ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip)
+## ⬇️ [下载 ZeroTogether_v10.2.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.2.zip)
 
 解压到游戏根目录 `PBZ\`,覆盖文件即可。需要先装好 UE4SS for Phantom Blade Zero 1.0.3(Vercadi)和幻影契约 1.7.4 官方版(见下面的[安装](#安装))。每个联机玩家都要装。
 
@@ -29,6 +29,7 @@
 - **客机第一次进房间后不能动、什么键都没用。** 按 F5 打开面板时,操作会切到"只操作菜单"模式。客机第一次加入时游戏会读图把你送进主机的世界,读图会换掉玩家控制器,面板关闭时就没把操作切回来。现在会用当前的控制器切回;还在读图的话,等控制器出现后马上切回。联机、PvP、本地分屏三个面板都修了。
 - **另一边看不到完整的处决动画。** 处决进行到一半时传来的死亡会直接打断敌人的动画,客机的致命一击也没有带上动画给主机播放。现在死亡会等处决播完(最多 2.6 秒)。
 - **联机打 Boss 时出现两条血条。** 游戏自己的血条和 mod 替队友那边战斗挂的血条可能同时留着。现在每个 Boss 只留一条,留下的那条跟着共享战斗的血量走。
+- **没人打过的 Boss 没了(新娘阿花)。** 客机打一个主机世界里还没出现的 Boss 时,主机会为这场战斗刷一个替身。如果这场没打死,替身被移除后,主机的刷怪点会显示成"已击败",客机那只就被判定击杀并写进存档。现在替身不再算击杀,刷怪点也会恢复原样。已经因此消失的 Boss:在**两台电脑**的 `PhantomPact.ini` 里加一行 `RestoreBoss = sp:AHua_Seq016`,走到它的场地附近就会恢复(这一行会自动清空),然后去钟那里休息或重新读档,Boss 就回来了。
 - **主机一过来,怪的血就回满了。** 主机离得远(大约 120 米以上)时,不会同步客机附近的怪,客机打的伤害主机那边收不到。主机一走近,主机那只满血的怪就接管了。现在两边的怪对上的那一刻,客机打掉的血会同步给主机。
 - **捡东西时被物品卡卡住。** 游戏有时会留下一张没有按钮的物品卡,没有任何键能关掉。现在这种卡 3 秒后会自动关掉(东西已经进背包了)。按 F10 能立刻关掉任何物品卡。
 - **有些门只有第一个人能开。** 队友开的门在你的世界里是跳过开门动画直接打开的,而有些门只有在动画里才会动:门一直关着,交互键也没了。现在如果 2 秒后门的任何部分都没动,就让你直接穿过去。
@@ -36,7 +37,7 @@
 ## 安装
 
 1. 按 [INSTALL.zh-CN.md](INSTALL.zh-CN.md) 的说明,装好 **UE4SS for Phantom Blade Zero**(Vercadi,Nexus Mods)1.0.3 或更新版,以及**幻影契约 1.7.4**。ZeroTogether 需要幻影契约发布包里编译好的 `main.dll`,这个源码仓库里没有。
-2. 直接下载打包好的 [ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip),解压到游戏根目录 `PBZ\` 覆盖即可。或者下载本仓库(**Code → Download ZIP**),把 `mod/PBZCoop/Scripts` 和 `mod/PBZCoop/art` 复制到 `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`,替换原有文件。你的 `PhantomPact.ini` 不会被动到。
+2. 直接下载打包好的 [ZeroTogether_v10.2.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.2.zip),解压到游戏根目录 `PBZ\` 覆盖即可。或者下载本仓库(**Code → Download ZIP**),把 `mod/PBZCoop/Scripts` 和 `mod/PBZCoop/art` 复制到 `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`,替换原有文件。你的 `PhantomPact.ini` 不会被动到。
 3. 每个玩家都要装 ZeroTogether:名字、血气和客机那边的修复都需要两台电脑都装。没装的玩家也能正常联机,只是显示成"主机"或"玩家 2",也只有血量。
 
 ## 新增设置(`PhantomPact.ini`)
@@ -52,6 +53,7 @@
 | `PartyBarsY` | `22` | 队伍列表从屏幕顶部往下多少开始,按屏幕高度的百分比算。 |
 | `HideUIKey` | `F9` | 隐藏/显示头顶名字和队伍列表。 |
 | `ResetKey` | `F10` | 上面说的重置键。 |
+| `RestoreBoss` | (空) | 要在本存档里恢复的 Boss(`sp:...`,多个用逗号隔开),见上面。恢复完自动清空。 |
 
 ## 代码改了哪里
 

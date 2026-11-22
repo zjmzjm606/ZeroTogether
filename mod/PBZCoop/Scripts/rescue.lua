@@ -12,6 +12,10 @@
 --       - in online co-op, a pause left on is lifted (online, the game never pauses for anything of its own);
 --       - the player's own animation stopped (a pickup or a door's that never ended);
 --       - a door opened here by word within DOOR_CM is made passable (blockers.passableNear: one that didn't move here).
+--
+-- RestoreBoss = sp:AHua_Seq016 (PhantomPact.ini, ids by commas): a boss this save has written beaten without anyone
+-- beating it (the stand-in bug of 1.7.4 to v10.1, pbz.lua's game.standIns) is put back, as each one's spawner loads (go
+-- near its arena), and the line is emptied once all are done. A rest at a bell or a reload then brings the boss.
 
 return function(api)
     local log = api.log
@@ -154,6 +158,43 @@ return function(api)
             "已重置：操作已恢复" .. (closed > 0 and ("，关闭了 " .. closed .. " 个物品卡") or "") .. "。")
     end
 
+    -- RestoreBoss: each id put back once its spawner is loaded; the line emptied when all are.
+    local restore = { done = {}, at = 0, line = nil }
+    local function restoreBosses(now)
+        local np = api.nameplates
+        local line = np and np.restoreBoss or ""
+        if line ~= restore.line then
+            restore.line, restore.done = line, {}
+        end
+        if line == "" or now - restore.at < 2 or not game.restoreSpawnerById then
+            return
+        end
+        restore.at = now
+        local left = 0
+        for id in line:gmatch("[^,%s]+") do
+            if not id:find("^sp:") then
+                id = "sp:" .. id
+            end
+            if not restore.done[id] then
+                local ok, r = pcall(game.restoreSpawnerById, id)
+                if ok and r then
+                    restore.done[id] = true
+                    say("boss " .. id .. " put back: rest at a bell or reload to meet it.",
+                        "Boss " .. id .. " 已恢复：去钟那里休息一下或重新读档就会出现。")
+                else
+                    left = left + 1
+                end
+            end
+        end
+        if left == 0 then
+            if api.panel and api.panel.kit and api.panel.kit.save then
+                pcall(api.panel.kit.save, { RestoreBoss = "" })
+            end
+            log("RestoreBoss: all put back; the line emptied.")
+            np.restoreBoss, restore.line = "", ""     -- (not again before the ini is read anew)
+        end
+    end
+
     local function keyName()
         local np = api.nameplates
         return (np and type(np.resetKey) == "string" and np.resetKey) or "F10"
@@ -178,6 +219,7 @@ return function(api)
             if now - lookAt >= C.LOOK_S then
                 lookAt = now
                 watch()
+                restoreBosses(now)
             end
         end)
         return false

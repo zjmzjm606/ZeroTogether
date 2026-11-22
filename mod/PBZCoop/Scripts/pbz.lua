@@ -612,6 +612,7 @@ return function(api)
     -- The game's own step for a spawner whose enemy has died: what it does is up to the spawner. (Its flags are its blueprint's,
     -- so only asked of one: UE4SS answers a property by name from whatever class has it.)
     function game.markBeaten(enemyId)
+        game.standIns[enemyId] = nil        -- [stand-in patch] (a real death: beaten is beaten now)
         local s = spawnerOf(enemyId)
         local ok, once = pcall(function()
             return s:IsA(StaticFindObject(SPAWNER_BP)) and s.SetShouldNotSpawnAfterDead == true
@@ -659,6 +660,11 @@ return function(api)
         local ok, should = pcall(function() return s:IsShouldToSpawn() end)
         if not ok or type(should) ~= "boolean" then
             return nil
+        end
+        -- [stand-in patch] Not by this PC's own stand-in's doing (game.standIns).
+        local st = game.standIns[enemyId]
+        if not should and st and st.wasBeaten == false then
+            return false
         end
         return not should
     end
@@ -817,6 +823,11 @@ return function(api)
                     return { X = l.X, Y = l.Y, Z = l.Z }, false
                 end
                 local beaten = not alive and game.isBeaten(enemyId)
+                -- [stand-in patch] (The record as this world had it before any stand-in of ours: kept for the session.
+                -- isBeaten already answers false for one only our stand-in made look beaten; its spawner is put back.)
+                if not alive and game.standIns[enemyId] and game.standIns[enemyId].wasBeaten == false then
+                    game.restoreSpawner(s, enemyId, "before its next stand-in")
+                end
                 if beaten and revive == false then
                     return { X = at.X, Y = at.Y, Z = at.Z }
                 end
@@ -847,6 +858,9 @@ return function(api)
                     -- was made, and the scene's own boss came in beside it, a bar each.)
                     if ok and not spawned then
                         spawned = { spawner = id }
+                    end
+                    if ok and game.standIns[enemyId] == nil then
+                        game.standIns[enemyId] = { wasBeaten = beaten == true }     -- [stand-in patch]
                     end
                 end
                 return { X = at.X, Y = at.Y, Z = at.Z }, beaten, spawned
@@ -925,18 +939,64 @@ return function(api)
     -- partner walked out, died or rested): it goes, with no death, as one the scene replaced does. Left, it stood with its
     -- own AI by the arena, the bells near it said "in combat", and a host who met it later fought a boss outside any
     -- encounter. True if it went.
-    function game.dropStandIn(mine)
+    function game.dropStandIn(mine, enemyId)
         for _, a in pairs(game.listEnemies() or {}) do
             if valid(a) and not game.isDead(a) and a:GetAddress() == mine.addr then
                 local ok, fname = pcall(function() return a:GetFName():ToString() end)
                 if ok and fname == mine.fname then
                     pcall(game.hideBossBar, a)
                     pcall(function() a:K2_DestroyActor() end)
+                    -- [stand-in patch] Its spawner as this world had it: the stand-in taken away left it saying "never
+                    -- again", read as beaten, and the partner's own copy was killed for it (A-Hua, 11-22). Only one this
+                    -- world hadn't beaten before the stand-in.
+                    local st = enemyId and game.standIns[enemyId]
+                    if st and st.wasBeaten == false then
+                        local s = spawnerOf(enemyId)
+                        if s then
+                            game.restoreSpawner(s, enemyId, "its stand-in taken away")
+                        end
+                    end
                     return true
                 end
             end
         end
         return false
+    end
+
+    -- [stand-in patch] A boss's spawner this PC spawned a stand-in from, for a partner's fight (game.spawnBoss): id ->
+    -- { wasBeaten }, as the record was before. Taking the stand-in away (game.dropStandIn) left the spawner saying it
+    -- won't spawn, isBeaten read that as beaten, and the host told the guest so: the guest's A-Hua was killed and written
+    -- beaten in their save, a boss neither player had beaten. Until a real death here (game.markBeaten), one not beaten
+    -- before isn't beaten. In memory for the session; restoreSpawner puts the record itself back.
+    game.standIns = {}
+
+    -- A spawner's record put back to "will spawn": as unmarkBeaten, and its saved info alive. True if it was written.
+    function game.restoreSpawner(s, enemyId, why)
+        local ok = pcall(function()
+            s.ShouldSpawn = true
+            pcall(function() s.SpawnerSaveInfo.IsAlive = true end)
+            if s:IsA(StaticFindObject(SPAWNER_BP)) then
+                s:Save()
+            end
+        end)
+        log((ok and "Spawner record of " or "Couldn't put back the spawner record of ") .. enemyId .. " (" .. why .. ").")
+        return ok
+    end
+
+    -- The same by id, if its spawner is loaded and has no live enemy out: nil when not loaded (rescue.lua's RestoreBoss).
+    function game.restoreSpawnerById(enemyId)
+        local s = spawnerOf(enemyId)
+        if not s then
+            return nil
+        end
+        local alive = false
+        pcall(function() alive = valid(s.SpawnedAI) and not game.isDead(s.SpawnedAI) end)
+        if alive then
+            return true
+        end
+        game.wroteBeaten = game.wroteBeaten or {}
+        game.wroteBeaten[enemyId] = nil
+        return game.restoreSpawner(s, enemyId, "RestoreBoss in PhantomPact.ini")
     end
 
     -- The host's enemy, in this world too: kills last for good in a save, so a guest who has played further has the early

@@ -845,7 +845,7 @@ return function(api)
         local stand = net.spawnedFor and net.spawnedFor[name]
         if stand then
             net.spawnedFor[name] = nil
-            if game.dropStandIn and game.dropStandIn(stand) then
+            if game.dropStandIn and game.dropStandIn(stand, name) then
                 log("The boss spawned here for the other player's fight with " .. name .. " went with that fight.")
             end
         end

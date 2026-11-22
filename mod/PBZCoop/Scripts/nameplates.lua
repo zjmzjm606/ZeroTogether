@@ -261,6 +261,7 @@ return function(api)
         local key = (s.hideuikey or "F9"):match("^%s*([%w_]+)%s*$")
         np.hideKey = key or "F9"
         np.resetKey = (s.resetkey or "F10"):match("^%s*([%w_]+)%s*$") or "F10"     -- (rescue.lua's)
+        np.restoreBoss = s.restoreboss or ""                                        -- (rescue.lua's)
         local y = tonumber(s.partybarsy)
         np.listTop = (y and y >= 0 and y <= 90) and y / 100 or C.LIST_TOP
         local name = clean(s.playername)

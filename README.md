@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-## ⬇️ [Download ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip)
+## ⬇️ [Download ZeroTogether_v10.2.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.2.zip)
 
 Unzip into the game's root folder `PBZ\` and overwrite. Needs UE4SS for Phantom Blade Zero 1.0.3 (Vercadi) and the official Phantom Pact 1.7.4 first (see [Install](#install)). Every player in the session needs it.
 
@@ -48,6 +48,12 @@ its author.
   the execution to finish (up to 2.6 s).
 - **Two boss health bars online.** The game's own bar and the mod's bar for a partner's fight could both stay up. One
   bar per boss is kept now, and the one kept follows the shared fight's health.
+- **A boss gone though nobody beat it (A-Hua).** When the guest fought a boss the host's world didn't have yet, the
+  host spawned a stand-in for that fight. If the fight ended without a kill, removing the stand-in left the host's
+  spawner reading "beaten", and the guest's boss was then killed and written beaten in their save. The stand-in no
+  longer counts as a kill, and the spawner is put back as it was. To get back a boss already lost this way, add
+  `RestoreBoss = sp:AHua_Seq016` to `PhantomPact.ini` on **both** PCs and walk near its arena: it is put back, the line
+  empties itself, and a rest at a bell or a reload brings the boss.
 - **An enemy back at full health when the host arrives.** With the host far off (over about 120 m), the host doesn't
   share the enemies around the guest, so the guest's hits never reached the host's world. When the host came near, its
   whole copy took over. Now the health the guest took off is carried over to the host's copy the moment the two pair up.
@@ -62,7 +68,7 @@ its author.
 1. Install **UE4SS for Phantom Blade Zero** (Vercadi, Nexus Mods) 1.0.3 or newer, and **Phantom Pact 1.7.4**, as
    [INSTALL.md](INSTALL.md) describes. ZeroTogether needs Phantom Pact's built `main.dll`, which is in its release and
    not in this source tree.
-2. Download the packaged [ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip) and unzip it into the game's root folder `PBZ\`, overwriting. Or download this repository (**Code → Download ZIP**) and copy `mod/PBZCoop/Scripts` and `mod/PBZCoop/art` into
+2. Download the packaged [ZeroTogether_v10.2.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.2.zip) and unzip it into the game's root folder `PBZ\`, overwriting. Or download this repository (**Code → Download ZIP**) and copy `mod/PBZCoop/Scripts` and `mod/PBZCoop/art` into
    `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`, replacing files. Your `PhantomPact.ini` is left as it is.
 3. Every player should install ZeroTogether: names, 血气 and the guest-side fixes need it on both PCs. A player without
    it still links up, and shows up as "Host" / "Player 2" with health only.
@@ -80,6 +86,7 @@ ZeroTogether adds these lines at the end of the file on first start. Each PC has
 | `PartyBarsY` | `22` | Where the party list starts, in percent of the screen's height from the top. |
 | `HideUIKey` | `F9` | Hides and shows the names and the party list. |
 | `ResetKey` | `F10` | The reset key above. |
+| `RestoreBoss` | (empty) | Boss ids (`sp:...`, by commas) to put back in this save, as above. Emptied when done. |
 
 ## What changed in the code
 
