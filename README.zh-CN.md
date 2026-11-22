@@ -32,7 +32,7 @@
 ## 安装
 
 1. 按 [INSTALL.zh-CN.md](INSTALL.zh-CN.md) 的说明,装好 **UE4SS for Phantom Blade Zero**(Vercadi,Nexus Mods)1.0.3 或更新版,以及**幻影契约 1.7.4**。ZeroTogether 需要幻影契约发布包里编译好的 `main.dll`,这个源码仓库里没有。
-2. 下载本仓库(**Code → Download ZIP**),把 `mod/PBZCoop/Scripts` 和 `mod/PBZCoop/art` 复制到 `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`,替换原有文件。你的 `PhantomPact.ini` 不会被动到。
+2. 直接下载打包好的 [ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip),解压到游戏根目录 `PBZ\` 覆盖即可。或者下载本仓库(**Code → Download ZIP**),把 `mod/PBZCoop/Scripts` 和 `mod/PBZCoop/art` 复制到 `PBZ\platform\steam\ue4ss\Mods\PBZCoop\`,替换原有文件。你的 `PhantomPact.ini` 不会被动到。
 3. 每个玩家都要装 ZeroTogether:名字、血气和客机那边的修复都需要两台电脑都装。没装的玩家也能正常联机,只是显示成"主机"或"玩家 2",也只有血量。
 
 ## 新增设置(`PhantomPact.ini`)
