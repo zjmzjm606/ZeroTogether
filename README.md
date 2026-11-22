@@ -2,6 +2,10 @@
 
 English | [简体中文](README.zh-CN.md)
 
+## ⬇️ [Download ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip)
+
+Unzip into the game's root folder `PBZ\` and overwrite. Needs UE4SS for Phantom Blade Zero 1.0.3 (Vercadi) and the official Phantom Pact 1.7.4 first (see [Install](#install)). Every player in the session needs it.
+
 **ZeroTogether** is an extended, unofficial fork of [Phantom Pact](https://github.com/yhsharaf/PhantomPact) by
 yhsharaf, the online co-op mod for **Phantom Blade Zero**. Everything Phantom Pact does is still here, plus the additions
 and fixes below. ZeroTogether is not made or endorsed by yhsharaf or by S-GAME; the credit for Phantom Pact itself goes to

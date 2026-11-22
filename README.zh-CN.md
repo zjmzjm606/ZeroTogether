@@ -2,6 +2,10 @@
 
 [English](README.md) | 简体中文
 
+## ⬇️ [下载 ZeroTogether_v10.1.zip](https://github.com/zjmzjm606/ZeroTogether/raw/main/release/ZeroTogether_v10.1.zip)
+
+解压到游戏根目录 `PBZ\`,覆盖文件即可。需要先装好 UE4SS for Phantom Blade Zero 1.0.3(Vercadi)和幻影契约 1.7.4 官方版(见下面的[安装](#安装))。每个联机玩家都要装。
+
 **ZeroTogether** 是 yhsharaf 的[幻影契约(Phantom Pact)](https://github.com/yhsharaf/PhantomPact)的一个非官方增强分支。幻影契约是《影之刃零》的线上联机模组,
 它原有的功能这里全部保留,另外加了下面这些新功能和修复。ZeroTogether 不是 yhsharaf 或 S-GAME 制作或认可的,幻影契约本身的功劳归原作者。
 
